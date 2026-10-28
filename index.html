@@ -131,7 +131,7 @@
         
         .session-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 10px;
             margin-top: 20px;
         }
@@ -153,10 +153,21 @@
         <h2>データを読み込み中...</h2>
     </div>
 
-    <!-- 3. 範囲選択画面 -->
+    <!-- 3. 範囲選択画面（大枠） -->
     <div id="screen-select" class="screen">
-        <h2>出題範囲を選択</h2>
+        <h2>ゼミの回を選択</h2>
         <div class="session-grid" id="session-buttons">
+            <!-- ボタンはJSで生成 -->
+        </div>
+    </div>
+
+    <!-- 3.5. 詳細範囲選択画面（20単語区切り / 実践テスト） -->
+    <div id="screen-sub-select" class="screen">
+        <div class="header-bar">
+            <button class="btn btn-secondary btn-small" onclick="showScreen('screen-select')">◀ 戻る</button>
+        </div>
+        <h2 id="sub-select-title">出題範囲を選択</h2>
+        <div class="session-grid" id="sub-session-buttons">
             <!-- ボタンはJSで生成 -->
         </div>
     </div>
@@ -164,7 +175,8 @@
     <!-- 4. テスト画面 -->
     <div id="screen-test" class="screen">
         <div class="header-bar">
-            <button class="btn btn-secondary btn-small" onclick="showScreen('screen-select')">◀ 戻る</button>
+            <!-- 戻るボタンは詳細範囲選択画面へ -->
+            <button class="btn btn-secondary btn-small" onclick="showScreen('screen-sub-select')">◀ 戻る</button>
             <div class="progress" id="progress-text"></div>
         </div>
         
@@ -188,7 +200,7 @@
         <h2 id="result-title">結果</h2>
         <p id="result-message" style="text-align:center; font-size: 18px; line-height: 1.6;"></p>
         <button class="btn" id="result-action-btn"></button>
-        <button class="btn" style="background-color:#7f8fa6; margin-top:20px;" onclick="showScreen('screen-select')">範囲選択へ戻る</button>
+        <button class="btn" style="background-color:#7f8fa6; margin-top:20px;" onclick="showScreen('screen-sub-select')">範囲選択へ戻る</button>
     </div>
 </div>
 
@@ -201,11 +213,12 @@
     let roundNumber = 1;
     let isWaitingForNext = false; 
 
-    // カウント用変数を追加
     let correctCount = 0;
     let wrongCount = 0;
 
-    const SYSTEM_PASSWORD = "gotolab"; 
+    let currentSessionNum = 1; // 現在選択中のゼミ回を記憶
+
+    const SYSTEM_PASSWORD = "gotolab"; // ←適宜変更してください
 
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -235,6 +248,7 @@
         }
     }
 
+    // 大枠（第1回, 第2回...）のボタン生成
     function generateSessionButtons() {
         const container = document.getElementById('session-buttons');
         container.innerHTML = '';
@@ -242,18 +256,56 @@
         const sessions = [...new Set(wordData.map(w => w.session))].sort((a, b) => a - b);
         
         sessions.forEach(sessionNum => {
-            const sessionWords = wordData.filter(w => w.session === sessionNum);
-            const minId = Math.min(...sessionWords.map(w => w.id));
-            const maxId = Math.max(...sessionWords.map(w => w.id));
-            
             const btn = document.createElement('button');
             btn.className = 'btn';
-            btn.innerHTML = `第${sessionNum}回<br><span style="font-size: 14px; font-weight: normal;">(${minId}〜${maxId})</span>`;
-            btn.onclick = () => startSession(sessionNum);
+            btn.innerText = `第${sessionNum}回`;
+            // ここで直接テストを開始せず、サブメニューへ
+            btn.onclick = () => showSubSelect(sessionNum);
             container.appendChild(btn);
         });
     }
 
+    // サブメニュー（20単語区切り ＆ 実践テスト）の生成
+    function showSubSelect(sessionNum) {
+        currentSessionNum = sessionNum;
+        const container = document.getElementById('sub-session-buttons');
+        container.innerHTML = '';
+        
+        const sessionWords = wordData.filter(w => w.session === sessionNum);
+        document.getElementById('sub-select-title').innerText = `第${sessionNum}回 - 範囲選択`;
+
+        // 20単語ずつに分割 (例: 140単語なら7分割)
+        const chunkSize = 20;
+        const numChunks = Math.ceil(sessionWords.length / chunkSize);
+        
+        for (let i = 0; i < numChunks; i++) {
+            // chunkは元の配列から20個切り出したもの
+            const chunk = sessionWords.slice(i * chunkSize, (i + 1) * chunkSize);
+            if (chunk.length === 0) continue;
+            
+            const minId = chunk[0].id;
+            const maxId = chunk[chunk.length - 1].id;
+            
+            const btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.innerHTML = `${minId}〜${maxId} <br><span style="font-size: 13px; font-weight:normal;">(${chunk.length}単語)</span>`;
+            btn.onclick = () => startRound(chunk, 1);
+            container.appendChild(btn);
+        }
+        
+        // 最後に「実践テスト（全140単語）」ボタンを追加
+        const testBtn = document.createElement('button');
+        testBtn.className = 'btn btn-danger'; // 目立つように赤色に
+        testBtn.style.gridColumn = '1 / -1';  // 全幅を使う
+        testBtn.style.marginTop = '10px';
+        testBtn.innerHTML = `🔥 実践テスト <span style="font-size: 14px; font-weight:normal;">(全${sessionWords.length}単語ランダム)</span>`;
+        testBtn.onclick = () => startRound(sessionWords, 1);
+        container.appendChild(testBtn);
+
+        showScreen('screen-sub-select');
+    }
+
+    // 配列のシャッフル関数
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -262,18 +314,13 @@
         return array;
     }
 
-    function startSession(sessionNum) {
-        const sessionWords = wordData.filter(w => w.session === sessionNum);
-        startRound(sessionWords, 1);
-    }
-
     function startRound(words, round) {
+        // 常にシャッフルして出題
         currentQueue = shuffleArray([...words]);
         wrongQueue = [];
         currentQuestionIndex = 0;
         roundNumber = round;
         
-        // 周回ごとにカウントをリセット
         correctCount = 0;
         wrongCount = 0;
         
@@ -281,7 +328,6 @@
         displayQuestion();
     }
 
-    // 進捗とスコアを更新する関数
     function updateProgressUI() {
         const total = currentQueue.length;
         const current = Math.min(currentQuestionIndex + 1, total);
@@ -335,7 +381,6 @@
         const correctAnswer = currentWord.word.trim().toLowerCase();
         
         if (userAnswer === correctAnswer) {
-            // 正解カウントを増やす
             correctCount++;
             updateProgressUI();
             
@@ -360,7 +405,6 @@
     function handleWrongAnswer(userAnswer) {
         isWaitingForNext = true;
         
-        // 不正解カウントを増やす
         if (!wrongQueue.includes(currentWord)) {
             wrongQueue.push(currentWord);
             wrongCount++;
@@ -401,7 +445,7 @@
         if (wrongQueue.length === 0) {
             title.innerText = "🎉 全問正解クリア！";
             title.style.color = "var(--success)";
-            message.innerHTML = `素晴らしい！<br>第${currentQueue[0].session}回の範囲を完璧にマスターしました。`;
+            message.innerHTML = `素晴らしい！<br>この範囲を完璧にマスターしました。`;
             actionBtn.style.display = 'none';
         } else {
             title.innerText = "まだまだ！";
