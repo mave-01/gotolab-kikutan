@@ -55,7 +55,6 @@
         .btn-danger { background-color: var(--danger); }
         .btn-secondary { background-color: #95a5a6; }
         
-        /* 戻るボタン用の小さなボタンスタイル */
         .btn-small {
             width: auto;
             padding: 8px 15px;
@@ -63,11 +62,10 @@
             font-size: 14px;
         }
 
-        /* ヘッダーバーのレイアウト */
         .header-bar {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 15px;
         }
         
@@ -123,10 +121,12 @@
             background-color: #fad390;
             color: var(--danger);
         }
+        
         .progress {
             text-align: right;
             font-size: 14px;
             color: #7f8fa6;
+            line-height: 1.5;
         }
         
         .session-grid {
@@ -163,7 +163,6 @@
 
     <!-- 4. テスト画面 -->
     <div id="screen-test" class="screen">
-        <!-- 上部ヘッダー（戻るボタンと進捗） -->
         <div class="header-bar">
             <button class="btn btn-secondary btn-small" onclick="showScreen('screen-select')">◀ 戻る</button>
             <div class="progress" id="progress-text"></div>
@@ -194,7 +193,6 @@
 </div>
 
 <script>
-    // --- グローバル変数 ---
     let wordData = [];     
     let currentQueue = []; 
     let wrongQueue = [];   
@@ -203,7 +201,11 @@
     let roundNumber = 1;
     let isWaitingForNext = false; 
 
-    const SYSTEM_PASSWORD = "gotolab"; 
+    // カウント用変数を追加
+    let correctCount = 0;
+    let wrongCount = 0;
+
+    const SYSTEM_PASSWORD = "zemi"; 
 
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -222,7 +224,6 @@
     async function loadData() {
         showScreen('screen-loading');
         try {
-            // URLにタイムスタンプをつけてキャッシュを回避（最新のデータを読み込む）
             const response = await fetch('words.json?' + new Date().getTime());
             if (!response.ok) throw new Error("JSON読み込みエラー");
             wordData = await response.json();
@@ -238,20 +239,16 @@
         const container = document.getElementById('session-buttons');
         container.innerHTML = '';
         
-        // ゼミの回（Session）のリストを取得して昇順に並べ替え
         const sessions = [...new Set(wordData.map(w => w.session))].sort((a, b) => a - b);
         
         sessions.forEach(sessionNum => {
-            // その回の単語だけを抽出
             const sessionWords = wordData.filter(w => w.session === sessionNum);
-            
-            // 最小IDと最大IDを計算してボタンのテキストを作成
             const minId = Math.min(...sessionWords.map(w => w.id));
             const maxId = Math.max(...sessionWords.map(w => w.id));
             
             const btn = document.createElement('button');
             btn.className = 'btn';
-            btn.innerText = `第${sessionNum}回 (${minId}〜${maxId})`;
+            btn.innerHTML = `第${sessionNum}回<br><span style="font-size: 14px; font-weight: normal;">(${minId}〜${maxId})</span>`;
             btn.onclick = () => startSession(sessionNum);
             container.appendChild(btn);
         });
@@ -275,8 +272,23 @@
         wrongQueue = [];
         currentQuestionIndex = 0;
         roundNumber = round;
+        
+        // 周回ごとにカウントをリセット
+        correctCount = 0;
+        wrongCount = 0;
+        
         showScreen('screen-test');
         displayQuestion();
+    }
+
+    // 進捗とスコアを更新する関数
+    function updateProgressUI() {
+        const total = currentQueue.length;
+        const current = Math.min(currentQuestionIndex + 1, total);
+        document.getElementById('progress-text').innerHTML = 
+            `周回: ${roundNumber} | 問題: ${current} / ${total}<br>` +
+            `<span style="color: var(--success); font-weight: bold;">⭕️ 正解: ${correctCount}</span> | ` +
+            `<span style="color: var(--danger); font-weight: bold;">❌ 不正解: ${wrongCount}</span>`;
     }
 
     function displayQuestion() {
@@ -288,7 +300,8 @@
         currentWord = currentQueue[currentQuestionIndex];
         isWaitingForNext = false;
         
-        document.getElementById('progress-text').innerText = `周回: ${roundNumber} | 問題: ${currentQuestionIndex + 1} / ${currentQueue.length}`;
+        updateProgressUI();
+        
         document.getElementById('word-id').innerText = `No. ${currentWord.id}`;
         document.getElementById('word-jp').innerText = currentWord.meaning;
         document.getElementById('sentence-jp').innerText = currentWord.sentence_jp;
@@ -322,6 +335,10 @@
         const correctAnswer = currentWord.word.trim().toLowerCase();
         
         if (userAnswer === correctAnswer) {
+            // 正解カウントを増やす
+            correctCount++;
+            updateProgressUI();
+            
             const card = document.getElementById('test-card');
             input.style.borderColor = 'var(--success)';
             card.style.backgroundColor = '#e8f8f5'; 
@@ -342,16 +359,20 @@
 
     function handleWrongAnswer(userAnswer) {
         isWaitingForNext = true;
+        
+        // 不正解カウントを増やす
+        if (!wrongQueue.includes(currentWord)) {
+            wrongQueue.push(currentWord);
+            wrongCount++;
+            updateProgressUI();
+        }
+
         const input = document.getElementById('answer-input');
         const card = document.getElementById('test-card');
         const feedbackArea = document.getElementById('feedback-area');
 
         input.style.borderColor = 'var(--danger)';
         card.style.backgroundColor = '#fdedec'; 
-        
-        if (!wrongQueue.includes(currentWord)) {
-            wrongQueue.push(currentWord);
-        }
         
         feedbackArea.className = 'feedback wrong';
         feedbackArea.innerHTML = `正解: <span style="font-size:24px;">${currentWord.word}</span><br><span style="font-size:14px; color:#7f8fa6;">あなたの入力: ${userAnswer}</span>`;
