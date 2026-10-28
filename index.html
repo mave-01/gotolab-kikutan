@@ -53,7 +53,23 @@
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: var(--success); }
         .btn-danger { background-color: var(--danger); }
-        .btn-secondary { background-color: #95a5a6; } /* わからないボタン用 */
+        .btn-secondary { background-color: #95a5a6; }
+        
+        /* 戻るボタン用の小さなボタンスタイル */
+        .btn-small {
+            width: auto;
+            padding: 8px 15px;
+            margin-bottom: 0;
+            font-size: 14px;
+        }
+
+        /* ヘッダーバーのレイアウト */
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
         
         input[type="text"], input[type="password"] {
             width: 100%;
@@ -77,7 +93,6 @@
             position: relative;
         }
         
-        /* 単語番号（ID）用のスタイル */
         .word-id-badge {
             position: absolute;
             top: 15px;
@@ -112,7 +127,6 @@
             text-align: right;
             font-size: 14px;
             color: #7f8fa6;
-            margin-bottom: 10px;
         }
         
         .session-grid {
@@ -149,11 +163,14 @@
 
     <!-- 4. テスト画面 -->
     <div id="screen-test" class="screen">
-        <div class="progress" id="progress-text"></div>
+        <!-- 上部ヘッダー（戻るボタンと進捗） -->
+        <div class="header-bar">
+            <button class="btn btn-secondary btn-small" onclick="showScreen('screen-select')">◀ 戻る</button>
+            <div class="progress" id="progress-text"></div>
+        </div>
+        
         <div class="card" id="test-card">
-            <!-- 単語番号を表示するバッジ -->
             <div id="word-id" class="word-id-badge"></div>
-            
             <div class="hint-jp" id="word-jp"></div>
             <div class="hint-sentence" id="sentence-jp"></div>
             <div class="eng-sentence" id="sentence-en"></div>
@@ -163,9 +180,7 @@
         
         <input type="text" id="answer-input" placeholder="英単語を入力" autocomplete="off" autocapitalize="off" spellcheck="false">
         
-        <!-- わからないボタン -->
         <button class="btn btn-secondary" id="idk-btn" onclick="skipQuestion()">わからない</button>
-        <!-- 次へボタン -->
         <button class="btn" id="next-btn" style="display:none;" onclick="nextQuestion()">次へ (Enter)</button>
     </div>
 
@@ -190,7 +205,6 @@
 
     const SYSTEM_PASSWORD = "gotolab"; 
 
-    // --- 画面遷移 ---
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
@@ -208,13 +222,14 @@
     async function loadData() {
         showScreen('screen-loading');
         try {
-            const response = await fetch('words.json');
+            // URLにタイムスタンプをつけてキャッシュを回避（最新のデータを読み込む）
+            const response = await fetch('words.json?' + new Date().getTime());
             if (!response.ok) throw new Error("JSON読み込みエラー");
             wordData = await response.json();
             generateSessionButtons();
             showScreen('screen-select');
         } catch (error) {
-            alert("データの読み込みに失敗しました。ローカルサーバー（Live Server等）で起動しているか確認してください。");
+            alert("データの読み込みに失敗しました。");
             console.error(error);
         }
     }
@@ -222,11 +237,21 @@
     function generateSessionButtons() {
         const container = document.getElementById('session-buttons');
         container.innerHTML = '';
-        const sessions = [...new Set(wordData.map(w => w.session))];
+        
+        // ゼミの回（Session）のリストを取得して昇順に並べ替え
+        const sessions = [...new Set(wordData.map(w => w.session))].sort((a, b) => a - b);
+        
         sessions.forEach(sessionNum => {
+            // その回の単語だけを抽出
+            const sessionWords = wordData.filter(w => w.session === sessionNum);
+            
+            // 最小IDと最大IDを計算してボタンのテキストを作成
+            const minId = Math.min(...sessionWords.map(w => w.id));
+            const maxId = Math.max(...sessionWords.map(w => w.id));
+            
             const btn = document.createElement('button');
             btn.className = 'btn';
-            btn.innerText = `第${sessionNum}回`;
+            btn.innerText = `第${sessionNum}回 (${minId}〜${maxId})`;
             btn.onclick = () => startSession(sessionNum);
             container.appendChild(btn);
         });
@@ -263,9 +288,8 @@
         currentWord = currentQueue[currentQuestionIndex];
         isWaitingForNext = false;
         
-        // 画面の更新
         document.getElementById('progress-text').innerText = `周回: ${roundNumber} | 問題: ${currentQuestionIndex + 1} / ${currentQueue.length}`;
-        document.getElementById('word-id').innerText = `No. ${currentWord.id}`; // 単語番号を表示
+        document.getElementById('word-id').innerText = `No. ${currentWord.id}`;
         document.getElementById('word-jp').innerText = currentWord.meaning;
         document.getElementById('sentence-jp').innerText = currentWord.sentence_jp;
         document.getElementById('sentence-en').innerText = currentWord.sentence;
@@ -277,8 +301,8 @@
         input.focus();
         
         document.getElementById('feedback-area').style.display = 'none';
-        document.getElementById('idk-btn').style.display = 'block'; // わからないボタンを表示
-        document.getElementById('next-btn').style.display = 'none'; // 次へボタンを隠す
+        document.getElementById('idk-btn').style.display = 'block'; 
+        document.getElementById('next-btn').style.display = 'none'; 
         document.getElementById('test-card').style.backgroundColor = 'var(--bg)';
     }
 
@@ -298,28 +322,24 @@
         const correctAnswer = currentWord.word.trim().toLowerCase();
         
         if (userAnswer === correctAnswer) {
-            // 正解処理
             const card = document.getElementById('test-card');
             input.style.borderColor = 'var(--success)';
             card.style.backgroundColor = '#e8f8f5'; 
-            document.getElementById('idk-btn').style.display = 'none'; // 正解したらボタンを隠す
+            document.getElementById('idk-btn').style.display = 'none'; 
             
             setTimeout(() => {
                 currentQuestionIndex++;
                 displayQuestion();
             }, 400); 
         } else {
-            // 不正解処理
             handleWrongAnswer(userAnswer);
         }
     }
 
-    // 「わからない」ボタンが押された時の処理
     function skipQuestion() {
         handleWrongAnswer("(無回答)");
     }
 
-    // 不正解・無回答の共通処理（次周へ持ち越す）
     function handleWrongAnswer(userAnswer) {
         isWaitingForNext = true;
         const input = document.getElementById('answer-input');
@@ -329,7 +349,6 @@
         input.style.borderColor = 'var(--danger)';
         card.style.backgroundColor = '#fdedec'; 
         
-        // 間違えたリストに追加（まだ入っていなければ）
         if (!wrongQueue.includes(currentWord)) {
             wrongQueue.push(currentWord);
         }
@@ -339,7 +358,7 @@
         feedbackArea.style.display = 'block';
         
         input.style.display = 'none';
-        document.getElementById('idk-btn').style.display = 'none'; // わからないボタンを隠す
+        document.getElementById('idk-btn').style.display = 'none'; 
         
         const nextBtn = document.getElementById('next-btn');
         nextBtn.style.display = 'block';
