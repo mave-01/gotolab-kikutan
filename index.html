@@ -436,21 +436,24 @@
             document.getElementById('sub-select-title').innerText = `第${sessionNum}回 - 範囲選択`;
         }
 
-        const chunkSize = 20;
-        const numChunks = Math.ceil(targetWords.length / chunkSize);
-        
-        for (let i = 0; i < numChunks; i++) {
-            const chunk = targetWords.slice(i * chunkSize, (i + 1) * chunkSize);
-            if (chunk.length === 0) continue;
+        // カスタム範囲ではない場合（第◯回を選択した場合）のみ、20単語区切りのボタンを生成
+        if (!customWords) {
+            const chunkSize = 20;
+            const numChunks = Math.ceil(targetWords.length / chunkSize);
             
-            const chunkMin = chunk[0].id;
-            const chunkMax = chunk[chunk.length - 1].id;
-            
-            const btn = document.createElement('button');
-            btn.className = 'btn';
-            btn.innerHTML = `${chunkMin}〜${chunkMax} <br><span style="font-size: 13px; font-weight:normal;">(${chunk.length}単語)</span>`;
-            btn.onclick = () => startRound(chunk, 1, false, false);
-            container.appendChild(btn);
+            for (let i = 0; i < numChunks; i++) {
+                const chunk = targetWords.slice(i * chunkSize, (i + 1) * chunkSize);
+                if (chunk.length === 0) continue;
+                
+                const chunkMin = chunk[0].id;
+                const chunkMax = chunk[chunk.length - 1].id;
+                
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.innerHTML = `${chunkMin}〜${chunkMax} <br><span style="font-size: 13px; font-weight:normal;">(${chunk.length}単語)</span>`;
+                btn.onclick = () => startRound(chunk, 1, false, false);
+                container.appendChild(btn);
+            }
         }
         
         const testBtnNormal = document.createElement('button');
@@ -461,7 +464,7 @@
         testBtnNormal.onclick = () => startRound(targetWords, 1, false, false);
         container.appendChild(testBtnNormal);
 
-        // カスタム範囲ではない場合（第◯回を選択した場合）のみ本番テストボタンを表示
+        // カスタム範囲ではない場合のみ本番テストボタンを表示
         if (!customWords) {
             const examBtn = document.createElement('button');
             examBtn.className = 'btn btn-danger';
