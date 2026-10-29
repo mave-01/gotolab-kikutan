@@ -9,7 +9,7 @@
             --primary: #4A90E2;
             --success: #2ecc71;
             --danger: #e74c3c;
-            --warning: #e67e22;
+            --warning: #f1c40f;
             --bg: #f5f6fa;
             --text: #2f3640;
         }
@@ -54,7 +54,7 @@
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: var(--success); }
         .btn-danger { background-color: var(--danger); }
-        .btn-warning { background-color: var(--warning); }
+        .btn-warning { background-color: #e67e22; }
         .btn-secondary { background-color: #95a5a6; }
         
         .btn-small {
@@ -83,7 +83,6 @@
         }
         input:focus { border-color: var(--primary); outline: none; }
 
-        /* スライダーの見た目調整 */
         input[type="range"] {
             -webkit-appearance: none;
             width: 100%;
@@ -108,7 +107,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
         
-        /* 手入力用の数字ボックス */
         .number-input {
             width: 80px;
             font-size: 18px;
@@ -197,12 +195,23 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        .reward-text {
+            font-size: 28px;
+            color: #e67e22;
+            font-weight: bold;
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e67e22;
+            display: inline-block;
+            margin: 15px 0;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- 1. ログイン画面 -->
     <div id="screen-login" class="screen active">
         <h1>ゼミ英単語システム</h1>
         <p style="text-align:center">パスワードを入力してください<br>(※ゼミ共通)</p>
@@ -210,12 +219,10 @@
         <button class="btn" onclick="checkPassword()">ログイン</button>
     </div>
 
-    <!-- 2. ローディング画面 -->
     <div id="screen-loading" class="screen">
         <h2>データを読み込み中...</h2>
     </div>
 
-    <!-- 3. 範囲選択画面（大枠 ＆ カスタムスライダー） -->
     <div id="screen-select" class="screen">
         <h2>ゼミの回を選択</h2>
         <div class="session-grid" id="session-buttons">
@@ -228,14 +235,12 @@
         <div style="margin-top: 15px;">
             <div class="slider-label">
                 <label>開始単語 (No.)</label>
-                <!-- スパンから手入力用のinputに変更 -->
                 <input type="number" id="custom-start-val" class="number-input" min="1" value="1">
             </div>
             <input type="range" id="custom-start" min="1" max="1120" value="1">
             
             <div class="slider-label">
                 <label>終了単語 (No.)</label>
-                <!-- スパンから手入力用のinputに変更 -->
                 <input type="number" id="custom-end-val" class="number-input" min="1" value="1120">
             </div>
             <input type="range" id="custom-end" min="1" max="1120" value="1120">
@@ -244,7 +249,6 @@
         </div>
     </div>
 
-    <!-- 3.5. 詳細範囲選択画面 -->
     <div id="screen-sub-select" class="screen">
         <div class="header-bar">
             <button class="btn btn-secondary btn-small" onclick="showScreen('screen-select')">◀ 戻る</button>
@@ -255,7 +259,6 @@
         </div>
     </div>
 
-    <!-- 4. テスト画面 -->
     <div id="screen-test" class="screen">
         <div class="header-bar">
             <button class="btn btn-secondary btn-small" onclick="backToSubSelect()">◀ 中断する</button>
@@ -278,10 +281,9 @@
         <button class="btn" id="next-btn" style="display:none;" onclick="nextQuestion()">次へ (Enter)</button>
     </div>
 
-    <!-- 5. 結果画面 -->
     <div id="screen-result" class="screen">
         <h2 id="result-title">結果</h2>
-        <p id="result-message" style="text-align:center; font-size: 18px; line-height: 1.6;"></p>
+        <div id="result-message" style="text-align:center; font-size: 18px; line-height: 1.6;"></div>
         <button class="btn" id="result-action-btn"></button>
         <button class="btn" style="background-color:#7f8fa6; margin-top:20px;" onclick="showScreen('screen-sub-select')">範囲選択へ戻る</button>
     </div>
@@ -299,11 +301,11 @@
     let correctCount = 0;
     let wrongCount = 0;
 
-    // タイマー用変数
     let timerInterval = null;
     let remainingTime = 0;
+    let isExamMode = false;
 
-    const SYSTEM_PASSWORD = "gotolab"; // ←パスワード変更時はここを直してください
+    const SYSTEM_PASSWORD = "gotolab"; 
 
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -335,7 +337,6 @@
         }
     }
 
-    // スライダーと手入力の連動処理
     function initSliders() {
         const maxId = Math.max(...wordData.map(w => w.id));
         const startSlider = document.getElementById('custom-start');
@@ -343,7 +344,6 @@
         const startVal = document.getElementById('custom-start-val');
         const endVal = document.getElementById('custom-end-val');
 
-        // 最大値を設定
         startSlider.max = maxId;
         endSlider.max = maxId;
         endSlider.value = maxId;
@@ -352,7 +352,6 @@
         endVal.max = maxId;
         endVal.value = maxId;
 
-        // スライダーを動かした時に入力欄を更新
         startSlider.addEventListener('input', () => {
             if (parseInt(startSlider.value) > parseInt(endSlider.value)) {
                 endSlider.value = startSlider.value;
@@ -369,7 +368,6 @@
             endVal.value = endSlider.value;
         });
 
-        // 入力欄に手入力した時にスライダーを更新
         startVal.addEventListener('change', () => {
             let val = parseInt(startVal.value);
             if (isNaN(val) || val < 1) val = 1;
@@ -412,7 +410,6 @@
         });
     }
 
-    // カスタム範囲のボタンが押されたときの処理（数字入力欄から値を取得）
     function startCustomRange() {
         const startId = parseInt(document.getElementById('custom-start-val').value);
         const endId = parseInt(document.getElementById('custom-end-val').value);
@@ -426,7 +423,6 @@
         showSubSelect(null, customWords, startId, endId);
     }
 
-    // サブメニュー（20単語区切り ＆ 実践テスト）の生成
     function showSubSelect(sessionNum = null, customWords = null, minId = null, maxId = null) {
         const container = document.getElementById('sub-session-buttons');
         container.innerHTML = '';
@@ -453,26 +449,27 @@
             const btn = document.createElement('button');
             btn.className = 'btn';
             btn.innerHTML = `${chunkMin}〜${chunkMax} <br><span style="font-size: 13px; font-weight:normal;">(${chunk.length}単語)</span>`;
-            btn.onclick = () => startRound(chunk, 1, false);
+            btn.onclick = () => startRound(chunk, 1, false, false);
             container.appendChild(btn);
         }
         
-        // 実践テスト（タイマーなし）
         const testBtnNormal = document.createElement('button');
         testBtnNormal.className = 'btn btn-warning';
         testBtnNormal.style.gridColumn = '1 / -1';
         testBtnNormal.style.marginTop = '10px';
-        testBtnNormal.innerHTML = `📚 実践テスト <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / タイマーなし)</span>`;
-        testBtnNormal.onclick = () => startRound(targetWords, 1, false);
+        testBtnNormal.innerHTML = `📚 実践テスト <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / 復習あり)</span>`;
+        testBtnNormal.onclick = () => startRound(targetWords, 1, false, false);
         container.appendChild(testBtnNormal);
 
-        // 実践テスト（3分タイマーあり）
-        const testBtnTimer = document.createElement('button');
-        testBtnTimer.className = 'btn btn-danger';
-        testBtnTimer.style.gridColumn = '1 / -1';
-        testBtnTimer.innerHTML = `⏱️ 実践テスト <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / 3分タイマー)</span>`;
-        testBtnTimer.onclick = () => startRound(targetWords, 1, true);
-        container.appendChild(testBtnTimer);
+        // カスタム範囲ではない場合（第◯回を選択した場合）のみ本番テストボタンを表示
+        if (!customWords) {
+            const examBtn = document.createElement('button');
+            examBtn.className = 'btn btn-danger';
+            examBtn.style.gridColumn = '1 / -1';
+            examBtn.innerHTML = `👑 本番テスト <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / 3分1本勝負 / 賞金つき)</span>`;
+            examBtn.onclick = () => startRound(targetWords, 1, true, true);
+            container.appendChild(examBtn);
+        }
 
         showScreen('screen-sub-select');
     }
@@ -490,8 +487,10 @@
         showScreen('screen-sub-select');
     }
 
-    function startRound(words, round, useTimer = false) {
+    function startRound(words, round, useTimer = false, isExam = false) {
         clearInterval(timerInterval); 
+        
+        isExamMode = isExam; 
         
         currentQueue = shuffleArray([...words]);
         wrongQueue = [];
@@ -530,21 +529,28 @@
     }
 
     function handleTimeUp() {
-        for (let i = currentQuestionIndex; i < currentQueue.length; i++) {
-            if (!wrongQueue.includes(currentQueue[i])) {
-                wrongQueue.push(currentQueue[i]);
-                wrongCount++;
+        if (!isExamMode) {
+            for (let i = currentQuestionIndex; i < currentQueue.length; i++) {
+                if (!wrongQueue.includes(currentQueue[i])) {
+                    wrongQueue.push(currentQueue[i]);
+                    wrongCount++;
+                }
             }
+            alert("⏳ タイムアップ！\n残りの問題は不正解として次周に持ち越されます。");
+        } else {
+            alert("⏳ タイムアップ！\n終了です。結果を確認しましょう。");
         }
-        alert("⏳ タイムアップ！\n残りの問題は不正解として次周に持ち越されます。");
         finishRound();
     }
 
     function updateProgressUI() {
         const total = currentQueue.length;
         const current = Math.min(currentQuestionIndex + 1, total);
+        
+        let roundText = isExamMode ? "" : `周回: ${roundNumber} | `;
+        
         document.getElementById('progress-text').innerHTML = 
-            `周回: ${roundNumber} | 問題: ${current} / ${total}<br>` +
+            `${roundText}問題: ${current} / ${total}<br>` +
             `<span style="color: var(--success); font-weight: bold;">⭕️ 正解: ${correctCount}</span> | ` +
             `<span style="color: var(--danger); font-weight: bold;">❌ 不正解: ${wrongCount}</span>`;
     }
@@ -605,7 +611,7 @@
             setTimeout(() => {
                 currentQuestionIndex++;
                 displayQuestion();
-            }, 50); 
+            }, 100); 
         } else {
             handleWrongAnswer(userAnswer);
         }
@@ -655,19 +661,39 @@
         const message = document.getElementById('result-message');
         const actionBtn = document.getElementById('result-action-btn');
 
-        if (wrongQueue.length === 0) {
-            title.innerText = "🎉 全問正解クリア！";
-            title.style.color = "var(--success)";
-            message.innerHTML = `素晴らしい！<br>この範囲を完璧にマスターしました。`;
+        if (isExamMode) {
+            const calculatedScore = (correctCount * 80) - (wrongCount * 20);
+            const finalScore = Math.max(0, calculatedScore);
+            
+            title.innerText = "🏁 本番テスト終了！";
+            title.style.color = "var(--primary)";
+            
+            message.innerHTML = `
+                【結果発表】<br>
+                <span style="color: var(--success); font-weight: bold;">⭕️ 正解: ${correctCount} 問</span><br>
+                <span style="color: var(--danger); font-weight: bold;">❌ 不正解: ${wrongCount} 問</span><br>
+                <span style="font-size: 13px; color: #7f8fa6;">(※未回答の問題は集計外)</span><br>
+                <div class="reward-text">獲得金額: ${finalScore} 円</div><br>
+                <span style="font-size: 14px; color: #7f8fa6;">(正解+80円 / 不正解-20円)</span>
+            `;
+            
             actionBtn.style.display = 'none';
+
         } else {
-            title.innerText = "まだまだ！";
-            title.style.color = "var(--danger)";
-            message.innerHTML = `間違えた単語が <strong>${wrongQueue.length} 問</strong> あります。<br>間違えた単語だけで ${roundNumber + 1} 周目を開始します。`;
-            actionBtn.style.display = 'block';
-            actionBtn.className = 'btn btn-danger';
-            actionBtn.innerText = `${roundNumber + 1}周目を開始する`;
-            actionBtn.onclick = () => startRound(wrongQueue, roundNumber + 1, false);
+            if (wrongQueue.length === 0) {
+                title.innerText = "🎉 全問正解クリア！";
+                title.style.color = "var(--success)";
+                message.innerHTML = `素晴らしい！<br>この範囲を完璧にマスターしました。`;
+                actionBtn.style.display = 'none';
+            } else {
+                title.innerText = "まだまだ！";
+                title.style.color = "var(--danger)";
+                message.innerHTML = `間違えた単語が <strong>${wrongQueue.length} 問</strong> あります。<br>間違えた単語だけで ${roundNumber + 1} 周目を開始します。`;
+                actionBtn.style.display = 'block';
+                actionBtn.className = 'btn btn-danger';
+                actionBtn.innerText = `${roundNumber + 1}周目を開始する`;
+                actionBtn.onclick = () => startRound(wrongQueue, roundNumber + 1, false, false);
+            }
         }
     }
 
