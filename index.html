@@ -9,6 +9,7 @@
             --primary: #4A90E2;
             --success: #2ecc71;
             --danger: #e74c3c;
+            --warning: #e67e22;
             --bg: #f5f6fa;
             --text: #2f3640;
         }
@@ -53,6 +54,7 @@
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: var(--success); }
         .btn-danger { background-color: var(--danger); }
+        .btn-warning { background-color: var(--warning); }
         .btn-secondary { background-color: #95a5a6; }
         
         .btn-small {
@@ -80,6 +82,48 @@
             text-align: center;
         }
         input:focus { border-color: var(--primary); outline: none; }
+
+        /* スライダーの見た目調整 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            margin: 15px 0 25px 0;
+        }
+        input[type="range"]:focus { outline: none; }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #dcdde1;
+            border-radius: 4px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        /* 手入力用の数字ボックス */
+        .number-input {
+            width: 80px;
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary);
+            text-align: right;
+            border: 1px solid #dcdde1;
+            border-radius: 4px;
+            padding: 4px 8px;
+            box-sizing: border-box;
+        }
+        .number-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
         
         .card {
             background: var(--bg);
@@ -129,11 +173,29 @@
             line-height: 1.5;
         }
         
+        .timer-display {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--danger);
+            background-color: #fdedec;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: none;
+        }
+
         .session-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
             gap: 10px;
             margin-top: 20px;
+        }
+
+        .slider-label {
+            font-weight: bold;
+            color: var(--text);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
     </style>
 </head>
@@ -143,7 +205,7 @@
     <!-- 1. ログイン画面 -->
     <div id="screen-login" class="screen active">
         <h1>ゼミ英単語システム</h1>
-        <p style="text-align:center">パスワードを入力してください<br></p>
+        <p style="text-align:center">パスワードを入力してください<br>(※ゼミ共通)</p>
         <input type="password" id="password-input" placeholder="パスワード">
         <button class="btn" onclick="checkPassword()">ログイン</button>
     </div>
@@ -153,15 +215,36 @@
         <h2>データを読み込み中...</h2>
     </div>
 
-    <!-- 3. 範囲選択画面（大枠） -->
+    <!-- 3. 範囲選択画面（大枠 ＆ カスタムスライダー） -->
     <div id="screen-select" class="screen">
         <h2>ゼミの回を選択</h2>
         <div class="session-grid" id="session-buttons">
             <!-- ボタンはJSで生成 -->
         </div>
+
+        <hr style="margin: 30px 0; border: none; border-top: 2px dashed #dcdde1;">
+        
+        <h2>カスタム範囲を選択</h2>
+        <div style="margin-top: 15px;">
+            <div class="slider-label">
+                <label>開始単語 (No.)</label>
+                <!-- スパンから手入力用のinputに変更 -->
+                <input type="number" id="custom-start-val" class="number-input" min="1" value="1">
+            </div>
+            <input type="range" id="custom-start" min="1" max="1120" value="1">
+            
+            <div class="slider-label">
+                <label>終了単語 (No.)</label>
+                <!-- スパンから手入力用のinputに変更 -->
+                <input type="number" id="custom-end-val" class="number-input" min="1" value="1120">
+            </div>
+            <input type="range" id="custom-end" min="1" max="1120" value="1120">
+            
+            <button class="btn btn-success" onclick="startCustomRange()">この範囲で学習する</button>
+        </div>
     </div>
 
-    <!-- 3.5. 詳細範囲選択画面（20単語区切り / 実践テスト） -->
+    <!-- 3.5. 詳細範囲選択画面 -->
     <div id="screen-sub-select" class="screen">
         <div class="header-bar">
             <button class="btn btn-secondary btn-small" onclick="showScreen('screen-select')">◀ 戻る</button>
@@ -175,8 +258,8 @@
     <!-- 4. テスト画面 -->
     <div id="screen-test" class="screen">
         <div class="header-bar">
-            <!-- 戻るボタンは詳細範囲選択画面へ -->
-            <button class="btn btn-secondary btn-small" onclick="showScreen('screen-sub-select')">◀ 戻る</button>
+            <button class="btn btn-secondary btn-small" onclick="backToSubSelect()">◀ 中断する</button>
+            <div id="timer-display" class="timer-display"></div>
             <div class="progress" id="progress-text"></div>
         </div>
         
@@ -216,9 +299,11 @@
     let correctCount = 0;
     let wrongCount = 0;
 
-    let currentSessionNum = 1; // 現在選択中のゼミ回を記憶
+    // タイマー用変数
+    let timerInterval = null;
+    let remainingTime = 0;
 
-    const SYSTEM_PASSWORD = "gotolab"; // ←適宜変更してください
+    const SYSTEM_PASSWORD = "gotolab"; // ←パスワード変更時はここを直してください
 
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -240,6 +325,8 @@
             const response = await fetch('words.json?' + new Date().getTime());
             if (!response.ok) throw new Error("JSON読み込みエラー");
             wordData = await response.json();
+            
+            initSliders(); 
             generateSessionButtons();
             showScreen('screen-select');
         } catch (error) {
@@ -248,7 +335,68 @@
         }
     }
 
-    // 大枠（第1回, 第2回...）のボタン生成
+    // スライダーと手入力の連動処理
+    function initSliders() {
+        const maxId = Math.max(...wordData.map(w => w.id));
+        const startSlider = document.getElementById('custom-start');
+        const endSlider = document.getElementById('custom-end');
+        const startVal = document.getElementById('custom-start-val');
+        const endVal = document.getElementById('custom-end-val');
+
+        // 最大値を設定
+        startSlider.max = maxId;
+        endSlider.max = maxId;
+        endSlider.value = maxId;
+        
+        startVal.max = maxId;
+        endVal.max = maxId;
+        endVal.value = maxId;
+
+        // スライダーを動かした時に入力欄を更新
+        startSlider.addEventListener('input', () => {
+            if (parseInt(startSlider.value) > parseInt(endSlider.value)) {
+                endSlider.value = startSlider.value;
+                endVal.value = endSlider.value;
+            }
+            startVal.value = startSlider.value;
+        });
+
+        endSlider.addEventListener('input', () => {
+            if (parseInt(endSlider.value) < parseInt(startSlider.value)) {
+                startSlider.value = endSlider.value;
+                startVal.value = startSlider.value;
+            }
+            endVal.value = endSlider.value;
+        });
+
+        // 入力欄に手入力した時にスライダーを更新
+        startVal.addEventListener('change', () => {
+            let val = parseInt(startVal.value);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > maxId) val = maxId;
+            
+            if (val > parseInt(endVal.value)) {
+                endVal.value = val;
+                endSlider.value = val;
+            }
+            startVal.value = val;
+            startSlider.value = val;
+        });
+
+        endVal.addEventListener('change', () => {
+            let val = parseInt(endVal.value);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > maxId) val = maxId;
+
+            if (val < parseInt(startVal.value)) {
+                startVal.value = val;
+                startSlider.value = val;
+            }
+            endVal.value = val;
+            endSlider.value = val;
+        });
+    }
+
     function generateSessionButtons() {
         const container = document.getElementById('session-buttons');
         container.innerHTML = '';
@@ -259,53 +407,76 @@
             const btn = document.createElement('button');
             btn.className = 'btn';
             btn.innerText = `第${sessionNum}回`;
-            // ここで直接テストを開始せず、サブメニューへ
             btn.onclick = () => showSubSelect(sessionNum);
             container.appendChild(btn);
         });
     }
 
+    // カスタム範囲のボタンが押されたときの処理（数字入力欄から値を取得）
+    function startCustomRange() {
+        const startId = parseInt(document.getElementById('custom-start-val').value);
+        const endId = parseInt(document.getElementById('custom-end-val').value);
+        
+        const customWords = wordData.filter(w => w.id >= startId && w.id <= endId);
+        
+        if(customWords.length === 0) {
+            alert("選択された範囲に単語が見つかりません。");
+            return;
+        }
+        showSubSelect(null, customWords, startId, endId);
+    }
+
     // サブメニュー（20単語区切り ＆ 実践テスト）の生成
-    function showSubSelect(sessionNum) {
-        currentSessionNum = sessionNum;
+    function showSubSelect(sessionNum = null, customWords = null, minId = null, maxId = null) {
         const container = document.getElementById('sub-session-buttons');
         container.innerHTML = '';
         
-        const sessionWords = wordData.filter(w => w.session === sessionNum);
-        document.getElementById('sub-select-title').innerText = `第${sessionNum}回 - 範囲選択`;
+        let targetWords;
+        if (customWords) {
+            targetWords = customWords;
+            document.getElementById('sub-select-title').innerText = `カスタム範囲 (No.${minId}〜${maxId})`;
+        } else {
+            targetWords = wordData.filter(w => w.session === sessionNum);
+            document.getElementById('sub-select-title').innerText = `第${sessionNum}回 - 範囲選択`;
+        }
 
-        // 20単語ずつに分割 (例: 140単語なら7分割)
         const chunkSize = 20;
-        const numChunks = Math.ceil(sessionWords.length / chunkSize);
+        const numChunks = Math.ceil(targetWords.length / chunkSize);
         
         for (let i = 0; i < numChunks; i++) {
-            // chunkは元の配列から20個切り出したもの
-            const chunk = sessionWords.slice(i * chunkSize, (i + 1) * chunkSize);
+            const chunk = targetWords.slice(i * chunkSize, (i + 1) * chunkSize);
             if (chunk.length === 0) continue;
             
-            const minId = chunk[0].id;
-            const maxId = chunk[chunk.length - 1].id;
+            const chunkMin = chunk[0].id;
+            const chunkMax = chunk[chunk.length - 1].id;
             
             const btn = document.createElement('button');
             btn.className = 'btn';
-            btn.innerHTML = `${minId}〜${maxId} <br><span style="font-size: 13px; font-weight:normal;">(${chunk.length}単語)</span>`;
-            btn.onclick = () => startRound(chunk, 1);
+            btn.innerHTML = `${chunkMin}〜${chunkMax} <br><span style="font-size: 13px; font-weight:normal;">(${chunk.length}単語)</span>`;
+            btn.onclick = () => startRound(chunk, 1, false);
             container.appendChild(btn);
         }
         
-        // 最後に「実践テスト（全140単語）」ボタンを追加
-        const testBtn = document.createElement('button');
-        testBtn.className = 'btn btn-danger'; // 目立つように赤色に
-        testBtn.style.gridColumn = '1 / -1';  // 全幅を使う
-        testBtn.style.marginTop = '10px';
-        testBtn.innerHTML = `🔥 実践テスト <span style="font-size: 14px; font-weight:normal;">(全${sessionWords.length}単語ランダム)</span>`;
-        testBtn.onclick = () => startRound(sessionWords, 1);
-        container.appendChild(testBtn);
+        // 実践テスト（タイマーなし）
+        const testBtnNormal = document.createElement('button');
+        testBtnNormal.className = 'btn btn-warning';
+        testBtnNormal.style.gridColumn = '1 / -1';
+        testBtnNormal.style.marginTop = '10px';
+        testBtnNormal.innerHTML = `📚 実践テスト <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / タイマーなし)</span>`;
+        testBtnNormal.onclick = () => startRound(targetWords, 1, false);
+        container.appendChild(testBtnNormal);
+
+        // 実践テスト（3分タイマーあり）
+        const testBtnTimer = document.createElement('button');
+        testBtnTimer.className = 'btn btn-danger';
+        testBtnTimer.style.gridColumn = '1 / -1';
+        testBtnTimer.innerHTML = `⏱️ 実践テスト <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / 3分タイマー)</span>`;
+        testBtnTimer.onclick = () => startRound(targetWords, 1, true);
+        container.appendChild(testBtnTimer);
 
         showScreen('screen-sub-select');
     }
 
-    // 配列のシャッフル関数
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -314,18 +485,59 @@
         return array;
     }
 
-    function startRound(words, round) {
-        // 常にシャッフルして出題
+    function backToSubSelect() {
+        clearInterval(timerInterval);
+        showScreen('screen-sub-select');
+    }
+
+    function startRound(words, round, useTimer = false) {
+        clearInterval(timerInterval); 
+        
         currentQueue = shuffleArray([...words]);
         wrongQueue = [];
         currentQuestionIndex = 0;
         roundNumber = round;
-        
         correctCount = 0;
         wrongCount = 0;
         
+        const timerDisplay = document.getElementById('timer-display');
+        
+        if (useTimer) {
+            remainingTime = 180; 
+            timerDisplay.style.display = 'block';
+            updateTimerUI();
+            
+            timerInterval = setInterval(() => {
+                remainingTime--;
+                updateTimerUI();
+                if (remainingTime <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeUp();
+                }
+            }, 1000);
+        } else {
+            timerDisplay.style.display = 'none';
+        }
+
         showScreen('screen-test');
         displayQuestion();
+    }
+
+    function updateTimerUI() {
+        const m = Math.floor(remainingTime / 60).toString().padStart(2, '0');
+        const s = (remainingTime % 60).toString().padStart(2, '0');
+        document.getElementById('timer-display').innerText = `⏱ ${m}:${s}`;
+    }
+
+    function handleTimeUp() {
+        for (let i = currentQuestionIndex; i < currentQueue.length; i++) {
+            if (!wrongQueue.includes(currentQueue[i])) {
+                wrongQueue.push(currentQueue[i]);
+                wrongCount++;
+            }
+        }
+        alert("⏳ タイムアップ！\n残りの問題は不正解として次周に持ち越されます。");
+        finishRound();
     }
 
     function updateProgressUI() {
@@ -339,6 +551,7 @@
 
     function displayQuestion() {
         if (currentQuestionIndex >= currentQueue.length) {
+            clearInterval(timerInterval);
             finishRound();
             return;
         }
@@ -454,7 +667,7 @@
             actionBtn.style.display = 'block';
             actionBtn.className = 'btn btn-danger';
             actionBtn.innerText = `${roundNumber + 1}周目を開始する`;
-            actionBtn.onclick = () => startRound(wrongQueue, roundNumber + 1);
+            actionBtn.onclick = () => startRound(wrongQueue, roundNumber + 1, false);
         }
     }
 
