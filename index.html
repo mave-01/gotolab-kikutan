@@ -223,7 +223,12 @@
         <h2>データを読み込み中...</h2>
     </div>
 
+    <!-- ★ 音声切り替えボタンを追加 -->
     <div id="screen-select" class="screen">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+            <button id="sound-toggle-btn" class="btn btn-small" style="background-color: var(--primary);" onclick="toggleSound()">🔊 音声: ON</button>
+        </div>
+
         <h2>ゼミの回を選択</h2>
         <div class="session-grid" id="session-buttons">
             <!-- ボタンはJSで生成 -->
@@ -305,7 +310,42 @@
     let remainingTime = 0;
     let isExamMode = false;
 
+    // ★ 音声ON/OFFのフラグ
+    let isSoundEnabled = true;
+
     const SYSTEM_PASSWORD = "gotolab"; 
+
+    const correctAudio = new Audio('correct.mp3');
+    const wrongAudio = new Audio('wrong.mp3');
+
+    // ★ 音声を切り替える関数
+    function toggleSound() {
+        isSoundEnabled = !isSoundEnabled;
+        const btn = document.getElementById('sound-toggle-btn');
+        if (isSoundEnabled) {
+            btn.innerHTML = '🔊 音声: ON';
+            btn.style.backgroundColor = 'var(--primary)';
+        } else {
+            btn.innerHTML = '🔇 音声: OFF';
+            btn.style.backgroundColor = '#95a5a6';
+        }
+    }
+
+    function playCorrectSound() {
+        if (!isSoundEnabled) return; // OFFなら鳴らさない
+        const soundClone = correctAudio.cloneNode();
+        soundClone.play().catch(error => {
+            console.log("音声の再生がブロックされました（ブラウザの仕様）", error);
+        });
+    }
+
+    function playWrongSound() {
+        if (!isSoundEnabled) return; // OFFなら鳴らさない
+        const soundClone = wrongAudio.cloneNode();
+        soundClone.play().catch(error => {
+            console.log("音声の再生がブロックされました（ブラウザの仕様）", error);
+        });
+    }
 
     function showScreen(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -436,7 +476,6 @@
             document.getElementById('sub-select-title').innerText = `第${sessionNum}回 - 範囲選択`;
         }
 
-        // カスタム範囲ではない場合（第◯回を選択した場合）のみ、20単語区切りのボタンを生成
         if (!customWords) {
             const chunkSize = 20;
             const numChunks = Math.ceil(targetWords.length / chunkSize);
@@ -464,7 +503,6 @@
         testBtnNormal.onclick = () => startRound(targetWords, 1, false, false);
         container.appendChild(testBtnNormal);
 
-        // カスタム範囲ではない場合のみ本番テストボタンを表示
         if (!customWords) {
             const examBtn = document.createElement('button');
             examBtn.className = 'btn btn-danger';
@@ -492,7 +530,6 @@
 
     function startRound(words, round, useTimer = false, isExam = false) {
         clearInterval(timerInterval); 
-        
         isExamMode = isExam; 
         
         currentQueue = shuffleArray([...words]);
@@ -603,6 +640,8 @@
         const correctAnswer = currentWord.word.trim().toLowerCase();
         
         if (userAnswer === correctAnswer) {
+            playCorrectSound();
+            
             correctCount++;
             updateProgressUI();
             
@@ -626,6 +665,8 @@
 
     function handleWrongAnswer(userAnswer) {
         isWaitingForNext = true;
+        
+        playWrongSound(); 
         
         if (!wrongQueue.includes(currentWord)) {
             wrongQueue.push(currentWord);
