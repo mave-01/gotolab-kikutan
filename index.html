@@ -67,7 +67,7 @@
         .header-bar {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             margin-bottom: 15px;
         }
         
@@ -223,10 +223,10 @@
         <h2>データを読み込み中...</h2>
     </div>
 
-    <!-- ★ 音声切り替えボタンを追加 -->
     <div id="screen-select" class="screen">
+        <!-- ★ 範囲選択画面の音声切り替えボタン -->
         <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
-            <button id="sound-toggle-btn" class="btn btn-small" style="background-color: var(--primary);" onclick="toggleSound()">🔊 音声: ON</button>
+            <button class="btn btn-small sound-toggle-btn" style="background-color: var(--primary);" onclick="toggleSound()">🔊 音声: ON</button>
         </div>
 
         <h2>ゼミの回を選択</h2>
@@ -265,10 +265,16 @@
     </div>
 
     <div id="screen-test" class="screen">
+        <!-- ★ テスト画面のヘッダーバーを改良 -->
         <div class="header-bar">
-            <button class="btn btn-secondary btn-small" onclick="backToSubSelect()">◀ 中断する</button>
-            <div id="timer-display" class="timer-display"></div>
-            <div class="progress" id="progress-text"></div>
+            <button class="btn btn-secondary btn-small" style="padding: 8px 12px;" onclick="backToSubSelect()">◀ 中断</button>
+            <div id="timer-display" class="timer-display" style="margin: 0 10px; flex-grow: 1; text-align: center;"></div>
+            
+            <div style="text-align: right;">
+                <!-- ★ テスト画面の音声切り替えボタン -->
+                <button class="btn btn-small sound-toggle-btn" style="background-color: var(--primary); margin-bottom: 5px; display: inline-block;" onclick="toggleSound()">🔊 音声: ON</button>
+                <div class="progress" id="progress-text"></div>
+            </div>
         </div>
         
         <div class="card" id="test-card">
@@ -310,7 +316,6 @@
     let remainingTime = 0;
     let isExamMode = false;
 
-    // ★ 音声ON/OFFのフラグ
     let isSoundEnabled = true;
 
     const SYSTEM_PASSWORD = "gotolab"; 
@@ -318,21 +323,23 @@
     const correctAudio = new Audio('correct.mp3');
     const wrongAudio = new Audio('wrong.mp3');
 
-    // ★ 音声を切り替える関数
+    // ★ 複数の音声ボタンを同時に切り替えるように修正
     function toggleSound() {
         isSoundEnabled = !isSoundEnabled;
-        const btn = document.getElementById('sound-toggle-btn');
-        if (isSoundEnabled) {
-            btn.innerHTML = '🔊 音声: ON';
-            btn.style.backgroundColor = 'var(--primary)';
-        } else {
-            btn.innerHTML = '🔇 音声: OFF';
-            btn.style.backgroundColor = '#95a5a6';
-        }
+        const btns = document.querySelectorAll('.sound-toggle-btn');
+        btns.forEach(btn => {
+            if (isSoundEnabled) {
+                btn.innerHTML = '🔊 音声: ON';
+                btn.style.backgroundColor = 'var(--primary)';
+            } else {
+                btn.innerHTML = '🔇 音声: OFF';
+                btn.style.backgroundColor = '#95a5a6';
+            }
+        });
     }
 
     function playCorrectSound() {
-        if (!isSoundEnabled) return; // OFFなら鳴らさない
+        if (!isSoundEnabled) return; 
         const soundClone = correctAudio.cloneNode();
         soundClone.play().catch(error => {
             console.log("音声の再生がブロックされました（ブラウザの仕様）", error);
@@ -340,7 +347,7 @@
     }
 
     function playWrongSound() {
-        if (!isSoundEnabled) return; // OFFなら鳴らさない
+        if (!isSoundEnabled) return; 
         const soundClone = wrongAudio.cloneNode();
         soundClone.play().catch(error => {
             console.log("音声の再生がブロックされました（ブラウザの仕様）", error);
@@ -507,7 +514,7 @@
             const examBtn = document.createElement('button');
             examBtn.className = 'btn btn-danger';
             examBtn.style.gridColumn = '1 / -1';
-            examBtn.innerHTML = `👑 本番テスト <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / 3分1本勝負 / 賞金つき)</span>`;
+            examBtn.innerHTML = `👑 本番 <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / 3分1本勝負 )</span>`;
             examBtn.onclick = () => startRound(targetWords, 1, true, true);
             container.appendChild(examBtn);
         }
