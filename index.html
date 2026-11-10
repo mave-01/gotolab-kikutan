@@ -50,6 +50,7 @@
             font-size: 16px;
             cursor: pointer;
             transition: opacity 0.2s;
+            box-sizing: border-box; 
         }
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: var(--success); }
@@ -218,7 +219,7 @@
         <input type="password" id="password-input" placeholder="パスワード">
         <button class="btn" onclick="checkPassword()">ログイン</button>
         <!-- hrefの中身を実際の中国語版URLに書き換えます -->
-        <a href="https://mave-01.github.io/gotolab-kikutan_ch/index.html" class="btn btn-warning" style="text-decoration: none; text-align: center; margin-top: 20px; display: block; background-color: #7f8fa6;">🇨🇳 中国語版はこちら (中文版)</a>
+        <a href="https://mave-01.github.io/gotolab-kikutan_ch/index.html" class="btn btn-warning" style="text-decoration: none; text-align: center; margin-top: 20px; display: block; background-color: #7f8fa6;">🇨🇳 切换至中文版</a>
     </div>
 
     <div id="screen-loading" class="screen">
