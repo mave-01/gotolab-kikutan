@@ -50,7 +50,7 @@
             font-size: 16px;
             cursor: pointer;
             transition: opacity 0.2s;
-            box-sizing: border-box; 
+            box-sizing: border-box;
         }
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: var(--success); }
@@ -208,6 +208,11 @@
             display: inline-block;
             margin: 15px 0;
         }
+
+        /* ラスト1問の点滅アニメーション */
+        @keyframes blink {
+            50% { opacity: 0.2; }
+        }
     </style>
 </head>
 <body>
@@ -218,8 +223,8 @@
         <p style="text-align:center">パスワードを入力してください<br>(※ゼミ共通)</p>
         <input type="password" id="password-input" placeholder="パスワード">
         <button class="btn" onclick="checkPassword()">ログイン</button>
-        <!-- hrefの中身を実際の中国語版URLに書き換えます -->
-        <a href="https://mave-01.github.io/gotolab-kikutan_ch/index.html" class="btn btn-warning" style="text-decoration: none; text-align: center; margin-top: 20px; display: block; background-color: #7f8fa6;">🇨🇳 切换至中文版</a>
+        
+        <a href="index_ch.html" class="btn btn-warning" style="text-decoration: none; text-align: center; margin-top: 20px; background-color: #7f8fa6;">🇨🇳 切换至中文版</a>
     </div>
 
     <div id="screen-loading" class="screen">
@@ -227,7 +232,6 @@
     </div>
 
     <div id="screen-select" class="screen">
-        <!-- ★ 範囲選択画面の音声切り替えボタン -->
         <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
             <button class="btn btn-small sound-toggle-btn" style="background-color: var(--primary);" onclick="toggleSound()">🔊 音声: ON</button>
         </div>
@@ -267,14 +271,35 @@
         </div>
     </div>
 
+    <!-- ★ 新規追加: 本番前のクッション画面 -->
+    <div id="screen-exam-prep" class="screen">
+        <div class="header-bar">
+            <button class="btn btn-secondary btn-small" onclick="showScreen('screen-sub-select')">◀ 戻る</button>
+        </div>
+        <h2>本番を始めます！</h2>
+        <div class="card" style="margin: 30px 0; text-align: left; padding: 25px;">
+            <h3 style="text-align: center; color: var(--danger); margin-top: 0;" id="exam-prep-session">第X回</h3>
+            <ul style="font-size: 16px; line-height: 1.8; color: var(--text);">
+                <li>⏱ 制限時間は <strong>3分間</strong> です。</li>
+                <li>💰 正解すると <strong>+80円</strong>、不正解・スキップは <strong>-20円</strong> になります。</li>
+                <li>🎯 最終的な獲得金額が結果に表示されます。（※マイナスの場合は0円）</li>
+                <li>⚠️ 3分経過後、入力中の<strong>「ラスト1問」</strong>を終えた時点でテスト終了となります。</li>
+            </ul>
+        </div>
+        <button class="btn btn-danger" style="font-size: 20px; font-weight: bold; padding: 20px;" id="exam-start-btn">Start</button>
+    </div>
+
     <div id="screen-test" class="screen">
-        <!-- ★ テスト画面のヘッダーバーを改良 -->
         <div class="header-bar">
             <button class="btn btn-secondary btn-small" style="padding: 8px 12px;" onclick="backToSubSelect()">◀ 中断</button>
             <div id="timer-display" class="timer-display" style="margin: 0 10px; flex-grow: 1; text-align: center;"></div>
             
+            <!-- ★ 新規追加: リアルタイム金額表示 -->
+            <div id="live-reward-container" style="display:none; font-weight:bold; color:#e67e22; font-size:18px; margin: 0 10px;">
+                💰 <span id="live-reward-display">0</span> 円
+            </div>
+            
             <div style="text-align: right;">
-                <!-- ★ テスト画面の音声切り替えボタン -->
                 <button class="btn btn-small sound-toggle-btn" style="background-color: var(--primary); margin-bottom: 5px; display: inline-block;" onclick="toggleSound()">🔊 音声: ON</button>
                 <div class="progress" id="progress-text"></div>
             </div>
@@ -318,15 +343,14 @@
     let timerInterval = null;
     let remainingTime = 0;
     let isExamMode = false;
+    let isLastQuestion = false; // ★ ラスト1問判定フラグ
 
     let isSoundEnabled = true;
 
     const SYSTEM_PASSWORD = "gotolab"; 
-
     const correctAudio = new Audio('correct.mp3');
     const wrongAudio = new Audio('wrong.mp3');
 
-    // ★ 複数の音声ボタンを同時に切り替えるように修正
     function toggleSound() {
         isSoundEnabled = !isSoundEnabled;
         const btns = document.querySelectorAll('.sound-toggle-btn');
@@ -344,17 +368,13 @@
     function playCorrectSound() {
         if (!isSoundEnabled) return; 
         const soundClone = correctAudio.cloneNode();
-        soundClone.play().catch(error => {
-            console.log("音声の再生がブロックされました（ブラウザの仕様）", error);
-        });
+        soundClone.play().catch(error => { console.log(error); });
     }
 
     function playWrongSound() {
         if (!isSoundEnabled) return; 
         const soundClone = wrongAudio.cloneNode();
-        soundClone.play().catch(error => {
-            console.log("音声の再生がブロックされました（ブラウザの仕様）", error);
-        });
+        soundClone.play().catch(error => { console.log(error); });
     }
 
     function showScreen(screenId) {
@@ -394,13 +414,8 @@
         const startVal = document.getElementById('custom-start-val');
         const endVal = document.getElementById('custom-end-val');
 
-        startSlider.max = maxId;
-        endSlider.max = maxId;
-        endSlider.value = maxId;
-        
-        startVal.max = maxId;
-        endVal.max = maxId;
-        endVal.value = maxId;
+        startSlider.max = maxId; endSlider.max = maxId; endSlider.value = maxId;
+        startVal.max = maxId; endVal.max = maxId; endVal.value = maxId;
 
         startSlider.addEventListener('input', () => {
             if (parseInt(startSlider.value) > parseInt(endSlider.value)) {
@@ -422,26 +437,16 @@
             let val = parseInt(startVal.value);
             if (isNaN(val) || val < 1) val = 1;
             if (val > maxId) val = maxId;
-            
-            if (val > parseInt(endVal.value)) {
-                endVal.value = val;
-                endSlider.value = val;
-            }
-            startVal.value = val;
-            startSlider.value = val;
+            if (val > parseInt(endVal.value)) { endVal.value = val; endSlider.value = val; }
+            startVal.value = val; startSlider.value = val;
         });
 
         endVal.addEventListener('change', () => {
             let val = parseInt(endVal.value);
             if (isNaN(val) || val < 1) val = 1;
             if (val > maxId) val = maxId;
-
-            if (val < parseInt(startVal.value)) {
-                startVal.value = val;
-                startSlider.value = val;
-            }
-            endVal.value = val;
-            endSlider.value = val;
+            if (val < parseInt(startVal.value)) { startVal.value = val; startSlider.value = val; }
+            endVal.value = val; endSlider.value = val;
         });
     }
 
@@ -463,7 +468,6 @@
     function startCustomRange() {
         const startId = parseInt(document.getElementById('custom-start-val').value);
         const endId = parseInt(document.getElementById('custom-end-val').value);
-        
         const customWords = wordData.filter(w => w.id >= startId && w.id <= endId);
         
         if(customWords.length === 0) {
@@ -471,6 +475,13 @@
             return;
         }
         showSubSelect(null, customWords, startId, endId);
+    }
+
+    // ★ 新規追加: 本番前のクッション画面を表示する関数
+    function showExamPrep(sessionNum, words) {
+        document.getElementById('exam-prep-session').innerText = `第${sessionNum}回`;
+        document.getElementById('exam-start-btn').onclick = () => startRound(words, 1, true, true);
+        showScreen('screen-exam-prep');
     }
 
     function showSubSelect(sessionNum = null, customWords = null, minId = null, maxId = null) {
@@ -489,11 +500,9 @@
         if (!customWords) {
             const chunkSize = 20;
             const numChunks = Math.ceil(targetWords.length / chunkSize);
-            
             for (let i = 0; i < numChunks; i++) {
                 const chunk = targetWords.slice(i * chunkSize, (i + 1) * chunkSize);
                 if (chunk.length === 0) continue;
-                
                 const chunkMin = chunk[0].id;
                 const chunkMax = chunk[chunk.length - 1].id;
                 
@@ -517,8 +526,9 @@
             const examBtn = document.createElement('button');
             examBtn.className = 'btn btn-danger';
             examBtn.style.gridColumn = '1 / -1';
-            examBtn.innerHTML = `👑 本番 <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / 3分1本勝負 )</span>`;
-            examBtn.onclick = () => startRound(targetWords, 1, true, true);
+            examBtn.innerHTML = `👑 本番テスト <span style="font-size: 14px; font-weight:normal;">(全${targetWords.length}単語 / 3分1本勝負 / 賞金つき)</span>`;
+            // ★ 本番テストはクッション画面へ移動するように変更
+            examBtn.onclick = () => showExamPrep(sessionNum, targetWords);
             container.appendChild(examBtn);
         }
 
@@ -541,6 +551,7 @@
     function startRound(words, round, useTimer = false, isExam = false) {
         clearInterval(timerInterval); 
         isExamMode = isExam; 
+        isLastQuestion = false; // ★ フラグを初期化
         
         currentQueue = shuffleArray([...words]);
         wrongQueue = [];
@@ -550,6 +561,15 @@
         wrongCount = 0;
         
         const timerDisplay = document.getElementById('timer-display');
+        const rewardContainer = document.getElementById('live-reward-container');
+        
+        // ★ 本番モード時のみリアルタイム金額表示をオン
+        if (isExamMode) {
+            rewardContainer.style.display = 'inline-block';
+            updateLiveReward();
+        } else {
+            rewardContainer.style.display = 'none';
+        }
         
         if (useTimer) {
             remainingTime = 180; 
@@ -558,10 +578,13 @@
             
             timerInterval = setInterval(() => {
                 remainingTime--;
-                updateTimerUI();
                 if (remainingTime <= 0) {
+                    // ★ 3分経過したら即終了せず、ラスト1問状態にする
                     clearInterval(timerInterval);
-                    handleTimeUp();
+                    isLastQuestion = true;
+                    timerDisplay.innerHTML = '<span style="color:var(--danger); animation: blink 1s infinite;">ラスト1問！</span>';
+                } else {
+                    updateTimerUI();
                 }
             }, 1000);
         } else {
@@ -578,19 +601,11 @@
         document.getElementById('timer-display').innerText = `⏱ ${m}:${s}`;
     }
 
-    function handleTimeUp() {
-        if (!isExamMode) {
-            for (let i = currentQuestionIndex; i < currentQueue.length; i++) {
-                if (!wrongQueue.includes(currentQueue[i])) {
-                    wrongQueue.push(currentQueue[i]);
-                    wrongCount++;
-                }
-            }
-            alert("⏳ タイムアップ！\n残りの問題は不正解として次周に持ち越されます。");
-        } else {
-            alert("⏳ タイムアップ！\n終了です。結果を確認しましょう。");
-        }
-        finishRound();
+    // ★ 新規追加: リアルタイム獲得金額の更新関数
+    function updateLiveReward() {
+        if (!isExamMode) return;
+        const currentReward = (correctCount * 80) - (wrongCount * 20);
+        document.getElementById('live-reward-display').innerText = currentReward;
     }
 
     function updateProgressUI() {
@@ -651,9 +666,9 @@
         
         if (userAnswer === correctAnswer) {
             playCorrectSound();
-            
             correctCount++;
             updateProgressUI();
+            updateLiveReward(); // ★ 金額を更新
             
             const card = document.getElementById('test-card');
             input.style.borderColor = 'var(--success)';
@@ -661,8 +676,13 @@
             document.getElementById('idk-btn').style.display = 'none'; 
             
             setTimeout(() => {
-                currentQuestionIndex++;
-                displayQuestion();
+                // ★ ラスト1問状態なら正解直後に終了
+                if (isLastQuestion) {
+                    finishRound();
+                } else {
+                    currentQuestionIndex++;
+                    displayQuestion();
+                }
             }, 100); 
         } else {
             handleWrongAnswer(userAnswer);
@@ -675,13 +695,13 @@
 
     function handleWrongAnswer(userAnswer) {
         isWaitingForNext = true;
-        
         playWrongSound(); 
         
         if (!wrongQueue.includes(currentWord)) {
             wrongQueue.push(currentWord);
             wrongCount++;
             updateProgressUI();
+            updateLiveReward(); // ★ 金額を更新
         }
 
         const input = document.getElementById('answer-input');
@@ -705,8 +725,13 @@
     }
 
     function nextQuestion() {
-        currentQuestionIndex++;
-        displayQuestion();
+        // ★ 間違えた後の「次へ」ボタンを押した時、ラスト1問なら終了
+        if (isLastQuestion) {
+            finishRound();
+        } else {
+            currentQuestionIndex++;
+            displayQuestion();
+        }
     }
 
     function finishRound() {
@@ -717,7 +742,7 @@
 
         if (isExamMode) {
             const calculatedScore = (correctCount * 80) - (wrongCount * 20);
-            const finalScore = Math.max(0, calculatedScore);
+            const finalScore = Math.max(0, calculatedScore); // 最終結果は0円下限
             
             title.innerText = "🏁 本番テスト終了！";
             title.style.color = "var(--primary)";
