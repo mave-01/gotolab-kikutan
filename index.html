@@ -233,8 +233,7 @@
 
     <div id="screen-select" class="screen">
         <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
-            <button class="btn btn-small sound-toggle-btn" style="background-color: var(--primary);" onclick="toggleSound()">🔊 音声: ON</button>
-        </div>
+            <button class="btn btn-small sound-toggle-btn" style="background-color: #95a5a6;" onclick="toggleSound()">🔇 音声: OFF</button>
 
         <h2>ゼミの回を選択</h2>
         <div class="session-grid" id="session-buttons">
@@ -300,7 +299,7 @@
             </div>
             
             <div style="text-align: right;">
-                <button class="btn btn-small sound-toggle-btn" style="background-color: var(--primary); margin-bottom: 5px; display: inline-block;" onclick="toggleSound()">🔊 音声: ON</button>
+                <button class="btn btn-small sound-toggle-btn" style="background-color: #95a5a6; margin-bottom: 5px; display: inline-block;" onclick="toggleSound()">🔇 音声: OFF</button>
                 <div class="progress" id="progress-text"></div>
             </div>
         </div>
@@ -345,7 +344,7 @@
     let isExamMode = false;
     let isLastQuestion = false; // ★ ラスト1問判定フラグ
 
-    let isSoundEnabled = true;
+    let isSoundEnabled = false;
 
     const SYSTEM_PASSWORD = "gotolab"; 
     const correctAudio = new Audio('correct.mp3');
