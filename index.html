@@ -50,7 +50,7 @@
             font-size: 16px;
             cursor: pointer;
             transition: opacity 0.2s;
-            box-sizing: border-box; /* ★ボタン幅を綺麗に揃える */
+            box-sizing: border-box;
         }
         .btn:hover { opacity: 0.9; }
         .btn-success { background-color: var(--success); }
@@ -209,7 +209,6 @@
             margin: 15px 0;
         }
 
-        /* ラスト1問の点滅アニメーション */
         @keyframes blink {
             50% { opacity: 0.2; }
         }
@@ -224,8 +223,8 @@
         <input type="password" id="password-input" placeholder="パスワード">
         <button class="btn" onclick="checkPassword()">ログイン</button>
         
-        <!-- 中国語話者が迷い込んだ時用のボタン -->
-        <a href="https://mave-01.github.io/gotolab-kikutan_ch/" class="btn btn-warning" style="text-decoration: none; text-align: center; margin-top: 20px; background-color: #7f8fa6;">🇨🇳 切换至中文版</a>
+        <!-- ★ ここを中国語版リポジトリの実際のURLに書き換えてください -->
+        <a href="https://[ユーザー名].github.io/[中国語版リポジトリ名]/index_ch.html" class="btn btn-warning" style="text-decoration: none; text-align: center; margin-top: 20px; display: block; background-color: #7f8fa6; box-sizing: border-box;">🇨🇳 切换至中文版</a>
     </div>
 
     <div id="screen-loading" class="screen">
@@ -233,15 +232,12 @@
     </div>
 
     <div id="screen-select" class="screen">
-        <!-- ★ここにちゃんと </div> があるため崩れません -->
         <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
             <button class="btn btn-small sound-toggle-btn" style="background-color: #95a5a6;" onclick="toggleSound()">🔇 音声: OFF</button>
         </div>
 
         <h2>ゼミの回を選択</h2>
-        <div class="session-grid" id="session-buttons">
-            <!-- ボタンはJSで生成 -->
-        </div>
+        <div class="session-grid" id="session-buttons"></div>
 
         <hr style="margin: 30px 0; border: none; border-top: 2px dashed #dcdde1;">
         
@@ -268,12 +264,9 @@
             <button class="btn btn-secondary btn-small" onclick="showScreen('screen-select')">◀ 戻る</button>
         </div>
         <h2 id="sub-select-title">出題範囲を選択</h2>
-        <div class="session-grid" id="sub-session-buttons">
-            <!-- ボタンはJSで生成 -->
-        </div>
+        <div class="session-grid" id="sub-session-buttons"></div>
     </div>
 
-    <!-- 本番前のクッション画面 -->
     <div id="screen-exam-prep" class="screen">
         <div class="header-bar">
             <button class="btn btn-secondary btn-small" onclick="showScreen('screen-sub-select')">◀ 戻る</button>
@@ -296,7 +289,6 @@
             <button class="btn btn-secondary btn-small" style="padding: 8px 12px;" onclick="backToSubSelect()">◀ 中断</button>
             <div id="timer-display" class="timer-display" style="margin: 0 10px; flex-grow: 1; text-align: center;"></div>
             
-            <!-- リアルタイム金額表示 -->
             <div id="live-reward-container" style="display:none; font-weight:bold; color:#e67e22; font-size:18px; margin: 0 10px;">
                 💰 <span id="live-reward-display">0</span> 円
             </div>
@@ -337,7 +329,8 @@
     let currentQuestionIndex = 0;
     let currentWord = null;
     let roundNumber = 1;
-    let isWaitingForNext = false; 
+    let isWaitingForNext = false;
+    let isRetrying = false; // 練習モードでの打ち直し中フラグ
 
     let correctCount = 0;
     let wrongCount = 0;
@@ -347,7 +340,6 @@
     let isExamMode = false;
     let isLastQuestion = false;
 
-    // ★ 音声デフォルトOFF
     let isSoundEnabled = false;
 
     const SYSTEM_PASSWORD = "gotolab"; 
@@ -552,7 +544,8 @@
     function startRound(words, round, useTimer = false, isExam = false) {
         clearInterval(timerInterval); 
         isExamMode = isExam; 
-        isLastQuestion = false; 
+        isLastQuestion = false;
+        isRetrying = false;
         
         currentQueue = shuffleArray([...words]);
         wrongQueue = [];
@@ -627,6 +620,7 @@
 
         currentWord = currentQueue[currentQuestionIndex];
         isWaitingForNext = false;
+        isRetrying = false;
         
         updateProgressUI();
         
@@ -636,7 +630,9 @@
         document.getElementById('sentence-en').innerText = currentWord.sentence;
         
         const input = document.getElementById('answer-input');
+        input.disabled = false;
         input.value = '';
+        input.placeholder = '英単語を入力';
         input.style.display = 'block';
         input.style.borderColor = '#dcdde1';
         input.focus();
@@ -659,11 +655,44 @@
 
     function checkAnswer() {
         const input = document.getElementById('answer-input');
+        if (input.disabled) return;
+
         const userAnswer = input.value.trim().toLowerCase();
         const correctAnswer = currentWord.word.trim().toLowerCase();
         
+        // 練習モードの打ち直し判定
+        if (isRetrying) {
+            if (userAnswer === correctAnswer) {
+                playCorrectSound();
+                input.disabled = true;
+                isRetrying = false;
+
+                const card = document.getElementById('test-card');
+                input.style.borderColor = 'var(--success)';
+                card.style.backgroundColor = '#e8f8f5';
+
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    displayQuestion();
+                }, 150);
+            } else {
+                playWrongSound();
+                input.style.borderColor = 'var(--danger)';
+                input.value = '';
+                input.focus();
+
+                const feedbackArea = document.getElementById('feedback-area');
+                feedbackArea.innerHTML =
+                    `正解: <span style="font-size:24px; user-select:none;">${currentWord.word}</span><br>` +
+                    `<span style="font-size:14px; color:var(--danger);">もう一度正しく入力してください (入力: ${userAnswer || '未入力'})</span>`;
+            }
+            return;
+        }
+
+        // 初回の通常判定
         if (userAnswer === correctAnswer) {
             playCorrectSound();
+            input.disabled = true;
             correctCount++;
             updateProgressUI();
             updateLiveReward();
@@ -691,7 +720,6 @@
     }
 
     function handleWrongAnswer(userAnswer) {
-        isWaitingForNext = true;
         playWrongSound(); 
         
         if (!wrongQueue.includes(currentWord)) {
@@ -707,18 +735,34 @@
 
         input.style.borderColor = 'var(--danger)';
         card.style.backgroundColor = '#fdedec'; 
-        
         feedbackArea.className = 'feedback wrong';
-        feedbackArea.innerHTML = `正解: <span style="font-size:24px;">${currentWord.word}</span><br><span style="font-size:14px; color:#7f8fa6;">あなたの入力: ${userAnswer}</span>`;
         feedbackArea.style.display = 'block';
-        
-        input.style.display = 'none';
-        document.getElementById('idk-btn').style.display = 'none'; 
-        
-        const nextBtn = document.getElementById('next-btn');
-        nextBtn.style.display = 'block';
-        nextBtn.className = 'btn btn-danger';
-        nextBtn.focus();
+        document.getElementById('idk-btn').style.display = 'none';
+
+        if (isExamMode) {
+            // 本番テスト：従来通り「次へ」で進行
+            isWaitingForNext = true;
+            feedbackArea.innerHTML = `正解: <span style="font-size:24px;">${currentWord.word}</span><br><span style="font-size:14px; color:#7f8fa6;">あなたの入力: ${userAnswer}</span>`;
+            input.style.display = 'none';
+            
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.style.display = 'block';
+            nextBtn.className = 'btn btn-danger';
+            nextBtn.focus();
+        } else {
+            // 練習モード：正解のスペルを打ち直すまで待機
+            isRetrying = true;
+            feedbackArea.innerHTML =
+                `正解: <span style="font-size:24px; user-select:none;">${currentWord.word}</span><br>` +
+                `<span style="font-size:14px; color:#7f8fa6;">あなたの入力: ${userAnswer}</span><br>` +
+                `<span style="font-size:14px; color:var(--danger);">※ 正解のスペルを入力して次へ進んでください</span>`;
+            
+            input.style.display = 'block';
+            input.value = '';
+            input.placeholder = '正解のスペルを入力';
+            input.focus();
+            document.getElementById('next-btn').style.display = 'none';
+        }
     }
 
     function nextQuestion() {
